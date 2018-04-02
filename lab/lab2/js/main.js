@@ -144,11 +144,18 @@ var updatePosition = function(lat, lng, updated) {
   goToOrigin(lat, lng);
 };
 
+// Set the original location
+var origin = {"lat":0, "lng":0};
+
 $(document).ready(function() {
   /* This 'if' check allows us to safely ask for the user's current position */
   if ("geolocation" in navigator) {
     navigator.geolocation.getCurrentPosition(function(position) {
       updatePosition(position.coords.latitude, position.coords.longitude, position.timestamp);
+      // Set current position as the origin
+      origin.lat = position.coords.latitude;
+      origin.lng = position.coords.longitude;
+      console.log(origin);
     });
   } else {
     alert("Unable to access geolocation API!");
@@ -169,9 +176,36 @@ $(document).ready(function() {
   // click handler for the "calculate" button (probably you want to do something with this)
   $("#calculate").click(function(e) {
     var dest = $('#dest').val();
-    console.log(dest);
+    //console.log(dest);
+    //*** Task 1: geocode user input of destination
+    var myToken = "pk.eyJ1Ijoibm9yYXlpbiIsImEiOiJjamZoYnVhajYzcWRjMnFvZnhkc2lkaDFnIn0.uwQxjsuwtL0epbau5U0M7Q";
+    var url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/' + dest + '.json?access_token=' + myToken;
+    //console.log(url);
+    $.getJSON(url).done(function(destination){
+      _.map(destination.features, function(point){
+        //*** Task 2: generate a route based on origin and destination
+        var eachDest = point.geometry.coordinates;
+        //console.log(eachDest);
+        var dest_lng = eachDest[0];
+        var dest_lat = eachDest[1];
+        var destMarker = L.circleMarker([dest_lat,dest_lng],{color:"red"}).addTo(map);
+        //*** Tast 3: decode the route responses generated
+        var route = "https://api.mapbox.com/directions/v5/mapbox/driving/" + origin.lng + "," + origin.lat + ";" + dest_lng + "," + dest_lat + "?access_token=" + myToken;
+        $.ajax(route).done(function(data){
+          var eachRoute = decode(data.routes[0].geometry);
+          var latlngs = _.map(eachRoute, function(each) {return [each[1]*10, each[0]*10];});
+          //console.log(latlngs);
+          //*** Tast 4: map the route - using turf.js
+          var line = turf.lineString(latlngs);
+          //console.log(line);
+          var myStyle = {
+            "color": "green",
+            "weight": 2,
+            "opacity": 0.65
+          };
+          L.geoJson(line, {style: myStyle}).addTo(map);
+        });
+      });
+    });
   });
-
 });
-
-

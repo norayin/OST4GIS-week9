@@ -55,7 +55,9 @@ var state = {
   count: 0,
   markers: [],
   line: undefined,
-}
+  start: [],
+  end: []
+};
 
 /** ---------------
 Map configuration
@@ -96,14 +98,16 @@ function. That being said, you are welcome to make changes if it helps.
 ---------------- */
 
 var resetApplication = function() {
-  _.each(state.markers, function(marker) { map.removeLayer(marker) })
+  _.each(state.markers, function(marker) { map.removeLayer(marker); });
   map.removeLayer(state.line);
-
   state.count = 0;
-  state.markers = []
+  state.markers = [];
   state.line = undefined;
+  state.start = [];
+  state.end = [];
   $('#button-reset').hide();
-}
+  $('.leaflet-draw').show();
+};
 
 $('#button-reset').click(resetApplication);
 
@@ -117,6 +121,34 @@ map.on('draw:created', function (e) {
   var type = e.layerType; // The type of shape
   var layer = e.layer; // The Leaflet layer for the shape
   var id = L.stamp(layer); // The unique Leaflet ID for the
+  //var myLayerGroup;
+  if (state.count === 0){
+    state.markers[0] = layer;
+    map.addLayer(layer);
+    state.start.push(_.values(layer._latlng));
+    state.count += 1;
 
-  console.log('Do something with the layer you just created:', layer, layer._latlng);
+  }else if (state.count === 1){
+    $('#button-reset').show();
+    $('.leaflet-draw').hide();
+    state.markers[1] = layer;
+    map.addLayer(layer);
+    state.end.push(_.values(layer._latlng));
+
+    // Now with the start and end points created, calculate the optimized route and plot the route
+    var myToken = "pk.eyJ1Ijoibm9yYXlpbiIsImEiOiJjamZoYnVhajYzcWRjMnFvZnhkc2lkaDFnIn0.uwQxjsuwtL0epbau5U0M7Q";
+    var trip = "https://api.mapbox.com/optimized-trips/v1/mapbox/driving/" + state.start[0][1] + "," + state.start[0][0] + ";" + state.end[0][1] + "," + state.end[0][0] + "?access_token=" + myToken;
+    $.ajax({
+          method: 'GET',
+          url:trip,
+        }).done(function(data){
+      var decodeTrip = decode(data.trips[0].geometry);
+      var latlngs = _.map(decodeTrip, function(each) {return [each[1]*10, each[0]*10];});
+      state.line = L.geoJSON(turf.lineString(latlngs), {
+        "color": "orange",
+        "weight": 3,
+        "opacity": 0.65
+      }).addTo(map);
+    });
+  }
 });
